@@ -1,3 +1,5 @@
+from model import generate_data, gradient_descent, compute_loss  
+
 st.title("Gradient Descent Visualizer (3D)")
 
 # Sidebar controls
