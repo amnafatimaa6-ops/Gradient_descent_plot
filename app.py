@@ -1,6 +1,15 @@
-from model import generate_data, gradient_descent, compute_loss  
+# app.py
+import streamlit as st
+import numpy as np
+import plotly.graph_objects as go
+import os
+import sys
 
-st.title("Gradient Descent Visualizer (3D)")
+# Add current folder to sys.path to avoid import errors
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from model import generate_data, gradient_descent, compute_loss
+
+st.title("Gradient Descent 3D Visualizer")
 
 # Sidebar controls
 lr = st.sidebar.slider("Learning Rate", 0.01, 1.0, 0.1, 0.01)
@@ -13,7 +22,7 @@ X, y = generate_data(n_points)
 # Run gradient descent
 theta_final, history = gradient_descent(X, y, lr=lr, epochs=epochs)
 
-# Create loss surface
+# Create loss surface for 3D plot
 theta0_range = np.linspace(-1, 10, 50)
 theta1_range = np.linspace(0, 6, 50)
 Theta0, Theta1 = np.meshgrid(theta0_range, theta1_range)
@@ -40,10 +49,10 @@ fig.add_trace(go.Scatter3d(
 ))
 
 fig.update_layout(scene=dict(
-    xaxis_title='Theta0',
-    yaxis_title='Theta1',
+    xaxis_title='Theta0 (Bias)',
+    yaxis_title='Theta1 (Slope)',
     zaxis_title='Loss'
 ))
 
 st.plotly_chart(fig)
-st.write("Final Parameters:", theta_final.ravel())
+st.write("Final Parameters (Theta0, Theta1):", theta_final.ravel())
