@@ -1,32 +1,50 @@
 # model.py
+import pandas as pd
 import numpy as np
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.linear_model import LinearRegression
 
-def generate_data(n_samples=20):
-    """
-    Simulate housing prices based on size (X) and price (y)
-    """
-    np.random.seed(42)
-    X = np.random.randint(50, 250, size=(n_samples, 1))  # house size in sq.m
-    y = 50 + 0.3 * X + np.random.randn(n_samples, 1) * 10  # price in 1000s
-    return X, y
+# Load data
+def load_data():
+    df = pd.read_csv("house_prices.csv")  
+    return df
 
-def compute_loss(theta, X, y):
-    m = len(y)
-    predictions = X.dot(theta[1:]) + theta[0]
-    loss = (1/(2*m)) * np.sum((predictions - y) ** 2)
-    return loss
+# Prepare features
+def prepare_data(df):
+    df = df.copy()
+    X_cat = df[['type','location','furnishing_status']]
+    X_num = df[['bedrooms','bathrooms','area sqft']]
+    
+    # One-hot encode categorical
+    enc = OneHotEncoder(sparse=False)
+    X_cat_enc = enc.fit_transform(X_cat)
+    feature_names = enc.get_feature_names_out(['type','location','furnishing_status'])
+    
+    # Combine numerical + categorical
+    X = np.hstack([X_num.values, X_cat_enc])
+    y = df['price'].values.reshape(-1,1)
+    return X, y, enc, feature_names
 
-def gradient_descent(X, y, lr=0.01, epochs=50):
-    m, n = X.shape
-    theta = np.random.randn(n+1, 1)  # [bias, slope]
-    history = []
+# Train a simple linear regression
+def train_model(X, y):
+    model = LinearRegression()
+    model.fit(X, y)
+    return model
 
-    for _ in range(epochs):
-        predictions = X.dot(theta[1:]) + theta[0]
-        error = predictions - y
-        grad0 = (1/m) * np.sum(error)
-        grad1 = (1/m) * X.T.dot(error)
-        theta[0] -= lr * grad0
-        theta[1:] -= lr * grad1
-        history.append(theta.copy())
-    return theta, np.array(history)
+# Predict price for a custom input
+def predict_price(model, enc, feature_names, custom_features):
+    # custom_features: dict with keys 'type','location','furnishing_status','bedrooms','bathrooms','area sqft'
+    X_num = np.array([[custom_features['bedrooms'], 
+                       custom_features['bathrooms'], 
+                       custom_features['area sqft']]])
+    
+    X_cat = pd.DataFrame([{
+        'type': custom_features['type'],
+        'location': custom_features['location'],
+        'furnishing_status': custom_features['furnishing_status']
+    }])
+    X_cat_enc = enc.transform(X_cat)
+    X_input = np.hstack([X_num, X_cat_enc])
+    
+    price = model.predict(X_input)
+    return price[0,0]
