@@ -1,57 +1,56 @@
 # app.py
 import streamlit as st
+import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from model import generate_data, gradient_descent, compute_loss
+from model import load_data, prepare_data, train_model, predict_price
 
-st.title("Interactive Gradient Descent on House Prices")
+st.title("Interactive House Price Playground")
 
-# Sidebar controls
-lr = st.sidebar.slider("Learning Rate", 0.001, 0.5, 0.01, 0.001)
-epochs = st.sidebar.slider("Epochs", 1, 100, 50)
-n_points = st.sidebar.slider("Number of Houses", 5, 50, 20)
+# Load and prepare data
+df = load_data()
+X, y, enc, feature_names = prepare_data(df)
+model = train_model(X, y)
 
-# Generate housing data
-X, y = generate_data(n_points)
+# Sidebar inputs
+property_type = st.sidebar.selectbox("Property Type", df['type'].unique())
+location = st.sidebar.selectbox("Location", df['location'].unique())
+furnishing = st.sidebar.selectbox("Furnishing Status", df['furnishing_status'].unique())
+bedrooms = st.sidebar.slider("Bedrooms", int(df['bedrooms'].min()), int(df['bedrooms'].max()), 3)
+bathrooms = st.sidebar.slider("Bathrooms", int(df['bathrooms'].min()), int(df['bathrooms'].max()), 3)
+area = st.sidebar.slider("Area (sqft)", int(df['area sqft'].min()), int(df['area sqft'].max()), 1500)
 
-# Let user modify a house price interactively
-for i in range(len(y)):
-    y[i, 0] = st.sidebar.slider(f"Price for house {i+1} (in 1000s)", float(y[i,0]-20), float(y[i,0]+20), float(y[i,0]))
+custom_input = {
+    'type': property_type,
+    'location': location,
+    'furnishing_status': furnishing,
+    'bedrooms': bedrooms,
+    'bathrooms': bathrooms,
+    'area sqft': area
+}
 
-# Run gradient descent
-theta_final, history = gradient_descent(X, y, lr=lr, epochs=epochs)
+# Predict price
+predicted_price = predict_price(model, enc, feature_names, custom_input)
 
-# Create loss surface
-theta0_range = np.linspace(np.min(history[:,0,0])-20, np.max(history[:,0,0])+20, 50)
-theta1_range = np.linspace(np.min(history[:,1,0])-0.5, np.max(history[:,1,0])+0.5, 50)
-Theta0, Theta1 = np.meshgrid(theta0_range, theta1_range)
-Loss = np.zeros_like(Theta0)
+st.subheader(f"Predicted Price: {predicted_price:,.0f} PKR")
 
-for i in range(Theta0.shape[0]):
-    for j in range(Theta0.shape[1]):
-        Loss[i,j] = compute_loss(np.array([[Theta0[i,j]], [Theta1[i,j]]]), X, y)
+# Gradient-Style Visual: show impact of changing one feature
+feature_to_test = st.selectbox("Test impact of feature", ['bedrooms','bathrooms','area sqft'])
+values = np.linspace(df[feature_to_test].min(), df[feature_to_test].max(), 50)
+predictions = []
 
-# 3D Plot with interactive gradient path
-fig = go.Figure(data=[go.Surface(z=Loss, x=Theta0, y=Theta1, colorscale='Viridis', opacity=0.8)])
-loss_path = [compute_loss(h, X, y) for h in history]
-theta0_path = history[:,0,0]
-theta1_path = history[:,1,0]
+for v in values:
+    temp = custom_input.copy()
+    temp[feature_to_test] = v
+    price = predict_price(model, enc, feature_names, temp)
+    predictions.append(price)
 
-fig.add_trace(go.Scatter3d(
-    x=theta0_path,
-    y=theta1_path,
-    z=loss_path,
-    mode='lines+markers',
-    line=dict(color='red', width=5),
-    marker=dict(size=3)
-))
-
-fig.update_layout(scene=dict(
-    xaxis_title='Theta0 (Bias)',
-    yaxis_title='Theta1 (Slope)',
-    zaxis_title='Loss'
-))
-
+# 3D-ish plot: feature vs predicted price
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=values, y=predictions, mode='lines+markers', name='Predicted Price'))
+fig.update_layout(
+    title=f"Impact of changing {feature_to_test} on predicted price",
+    xaxis_title=feature_to_test,
+    yaxis_title="Price (PKR)",
+)
 st.plotly_chart(fig)
-st.write("Final Parameters (Bias, Slope):", theta_final.ravel())
-st.write("You can adjust learning rate, epochs, or house prices using the sidebar to see how the gradient descent path changes.")
